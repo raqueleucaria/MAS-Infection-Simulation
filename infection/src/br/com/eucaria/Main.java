@@ -2,14 +2,20 @@ package br.com.eucaria;
 
 import br.com.eucaria.model.Board;
 import br.com.eucaria.model.Microbe;
+import br.com.eucaria.model.Space;
 import br.com.eucaria.model.StatusEnum;
 import br.com.eucaria.util.BoardTemplate;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 
 public class Main {
     private static final int MAX_TICKS = 100;
     private static final int TICK_DELAY_MS = 500; // Meio segundo por tick
+    private static final String OUTPUT_DIRECTORY = "output/";
 
     public static void main(String[] args) {
         Board board = BoardTemplate.createDefaultBoard();
@@ -26,7 +32,6 @@ public class Main {
             Collections.shuffle(allMicrobes); // Aleatoriza a ordem de decisão
 
             // --- Fase 1: Percepção e Decisão ---
-            // Cada agente decide sua ação com base no estado atual do tabuleiro.
             Map<Microbe, Microbe.Move> plannedMoves = new LinkedHashMap<>();
             for (Microbe microbe : allMicrobes) {
                 Microbe.Move move = microbe.decideAction(board);
@@ -44,19 +49,16 @@ public class Main {
                 Microbe.Move move = entry.getValue();
                 String target = move.toX() + "," + move.toY();
 
-                // Conflito: se a célula alvo já foi reivindicada neste tick, a ação falha.
                 if (!targetCells.contains(target)) {
                     targetCells.add(target);
-                    board.executeMove(microbe, move);
-                    // Guarda o micróbio na sua nova posição para a fase de infecção
+                    board.executeMove(microbe, move, tick);
                     movedMicrobes.add(new Microbe(move.toX(), move.toY(), microbe.getColor()));
                 }
             }
 
             // --- Fase 3: Infecção ---
-            // A infecção é aplicada com base no estado do tabuleiro APÓS todos se moverem.
             for (Microbe movedMicrobe : movedMicrobes) {
-                board.applyInfection(movedMicrobe.getX(), movedMicrobe.getY(), movedMicrobe.getColor());
+                board.applyInfection(movedMicrobe.getX(), movedMicrobe.getY(), movedMicrobe.getColor(), tick);
             }
 
             // Imprime o estado atual
@@ -70,7 +72,6 @@ public class Main {
                 else blueCount++;
             }
             System.out.printf("Placar: Vermelhos (R) = %d | Azuis (B) = %d%n", redCount, blueCount);
-
 
             // --- Condição de Término ---
             if (redCount == 0 || blueCount == 0 || (redCount + blueCount == Board.SIZE * Board.SIZE)) {
@@ -92,6 +93,20 @@ public class Main {
                 Thread.currentThread().interrupt();
             }
         }
+
+//        // --- Análise dos Dados no Final da Simulação (Console) ---
+//        System.out.println("\n### Análise Histórica dos Espaços ###");
+//        for (int y = 0; y < Board.SIZE; y++) {
+//            for (int x = 0; x < Board.SIZE; x++) {
+//                Space space = board.getSpaceAt(x, y);
+//                if (space.getHistory().size() > 1) {
+//                    System.out.printf("Histórico para a célula (%d, %d): %s\n", x, y, space.getHistory());
+//                }
+//            }
+//        }
+
+        // --- Salvar dados em arquivo CSV ---
+        saveHistoryToCSV(board, OUTPUT_DIRECTORY + "historico_simulacao.csv");
     }
 
     /**
@@ -107,5 +122,46 @@ public class Main {
             }
         }
         return microbes;
+    }
+
+    /**
+     * Salva o histórico completo da simulação em um arquivo CSV.
+     * O arquivo terá as colunas: tick,x,y,status
+     *
+     * @param board    O tabuleiro contendo todos os espaços e seus históricos.
+     * @param filePath O caminho completo do arquivo a ser criado (ex: "output/historico_simulacao.csv").
+     */
+    private static void saveHistoryToCSV(Board board, String filePath) {
+        try {
+            // Garante que o diretório de saída exista
+            File outputDir = new File(OUTPUT_DIRECTORY);
+            if (!outputDir.exists()) {
+                outputDir.mkdirs(); // mkdirs() cria diretórios pais se necessário
+            }
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+                // Escreve o cabeçalho do CSV
+                writer.write("tick,x,y,status\n");
+
+                // Itera por cada célula do tabuleiro
+                for (int y = 0; y < Board.SIZE; y++) {
+                    for (int x = 0; x < Board.SIZE; x++) {
+                        Space space = board.getSpaceAt(x, y);
+                        // Itera por cada mudança de estado no histórico da célula
+                        for (Space.StateChange change : space.getHistory()) {
+                            String line = String.format("%d,%d,%d,%s\n",
+                                    change.tick(), x, y, change.status().name());
+                            writer.write(line);
+                        }
+                    }
+                }
+                // Adicionado código de cor verde para a mensagem de sucesso
+                System.out.println("\n" + StatusEnum.ANSI_GREEN + "Histórico da simulação salvo com sucesso em: " + filePath + StatusEnum.ANSI_RESET);
+
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao salvar o arquivo de histórico: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
