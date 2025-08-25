@@ -19,7 +19,6 @@ public class MicrobeAgent extends Agent {
     private int y;
     private StatusEnum color;
     private final Random random = new Random();
-    private TickerBehaviour mainBehaviour;
 
     @Override
     protected void setup() {
@@ -28,8 +27,6 @@ public class MicrobeAgent extends Agent {
             this.x = (int) args[0];
             this.y = (int) args[1];
             this.color = (StatusEnum) args[2];
-
-            // O tick inicial é 0
             EnvironmentService.getInstance().placeMicrobe(this, this.x, this.y, 0);
             System.out.println("Agente " + getLocalName() + " nascido em (" + x + "," + y + ")");
         } else {
@@ -37,15 +34,14 @@ public class MicrobeAgent extends Agent {
             return;
         }
 
-        mainBehaviour = new TickerBehaviour(this, 1000) {
+        addBehaviour(new TickerBehaviour(this, 1000) {
             @Override
             protected void onTick() {
                 if (EnvironmentService.getInstance().isGameOver()) {
-                    stop(); // Para o comportamento
-                    myAgent.doDelete(); // E se autodestrói
+                    stop();
+                    myAgent.doDelete();
                     return;
                 }
-
                 Move chosenMove = decideAction();
                 if (chosenMove != null) {
                     boolean moved = EnvironmentService.getInstance().tryExecuteMove(myAgent, chosenMove, getTickCount());
@@ -54,20 +50,18 @@ public class MicrobeAgent extends Agent {
                     }
                 }
             }
-        };
-        addBehaviour(mainBehaviour);
+        });
     }
 
-    public void beConverted(StatusEnum newColor, int tick) {
+    /**
+     * MÉTODO CORRIGIDO: Agora, apenas o estado interno do agente é alterado.
+     * A responsabilidade de atualizar o tabuleiro fica com quem chamou o método.
+     */
+    public void beConverted(StatusEnum newColor) {
         System.out.println("Agente " + getLocalName() + " foi convertido de " + this.color + " para " + newColor);
         this.color = newColor;
-        // Precisamos registrar essa mudança no histórico do Space também
-        Board board = EnvironmentService.getInstance().getBoard();
-        board.getSpaceAt(this.x, this.y).setMicrobe(this, tick); // Força um novo registro de estado
     }
 
-    // ... (decideAction, findBestInfectionMove, findPossibleMoves, updatePosition, getters, takeDown)
-    // O restante da classe pode permanecer o mesmo
     public void updatePosition(int newX, int newY) {
         this.x = newX;
         this.y = newY;

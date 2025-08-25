@@ -1,6 +1,8 @@
 package br.com.eucaria.model;
 
 import br.com.eucaria.agent.MicrobeAgent;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Board {
     public static final int SIZE = 7;
@@ -29,25 +31,52 @@ public class Board {
         placeMicrobe(microbe, move.toX(), move.toY(), tick);
     }
 
+    /**
+     * MÉTODO CORRIGIDO: Implementa a lógica de duas fases para evitar reação em cadeia.
+     */
     public void applyInfection(int x, int y, StatusEnum attackerColor, int tick) {
         StatusEnum opponentColor = StatusEnum.getOpponent(attackerColor);
+
+        // Fase 1: Identificar todos os vizinhos a serem convertidos e guardá-los em uma lista.
+        List<MicrobeAgent> agentsToConvert = new ArrayList<>();
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 if (i == 0 && j == 0) continue;
-                int neighborX = x + i;
-                int neighborY = y + j;
 
-                MicrobeAgent neighbor = getMicrobeAt(neighborX, neighborY);
-                if (neighbor != null && neighbor.getColor() == opponentColor) {
-                    neighbor.beConverted(attackerColor, tick);
+                int neighborX = x + j;
+                int neighborY = y + i;
+
+                Space neighborSpace = getSpaceAt(neighborX, neighborY);
+                if (neighborSpace != null && neighborSpace.isOccupied() && neighborSpace.getStatus() == opponentColor) {
+                    agentsToConvert.add(neighborSpace.getMicrobe());
                 }
             }
         }
+
+        // Fase 2: Converter todos os agentes que foram identificados.
+        for (MicrobeAgent neighbor : agentsToConvert) {
+            neighbor.beConverted(attackerColor);
+            // Atualiza o Space do agente convertido para registrar a mudança no histórico.
+            getSpaceAt(neighbor.getX(), neighbor.getY()).setMicrobe(neighbor, tick);
+        }
     }
 
-    // Demais métodos (getSpaceAt, getMicrobeAt, countPotentialInfections, isOutOfBounds, toString)
-    // permanecem como na versão anterior. Adiciono removeMicrobe para consistência.
+    public int countPotentialInfections(int x, int y, StatusEnum attackerColor) {
+        int count = 0;
+        StatusEnum opponentColor = StatusEnum.getOpponent(attackerColor);
+        for (int i = -1; i <= 1; i++) { // y-offset
+            for (int j = -1; j <= 1; j++) { // x-offset
+                if (i == 0 && j == 0) continue;
+                Space neighborSpace = getSpaceAt(x + j, y + i);
+                if (neighborSpace != null && neighborSpace.getStatus() == opponentColor) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
 
+    // O restante da classe (getters, toString, etc.) permanece o mesmo...
     public Space getSpaceAt(int x, int y) {
         if (isOutOfBounds(x, y)) return null;
         return grid[y][x];
@@ -59,26 +88,7 @@ public class Board {
     }
 
     public void removeMicrobe(int x, int y) {
-        Space space = getSpaceAt(x, y);
-        if (space != null) {
-            // O tick idealmente seria passado aqui se a remoção precisasse ser historiada
-            // space.clear(tick);
-        }
-    }
-
-    public int countPotentialInfections(int x, int y, StatusEnum attackerColor) {
-        int count = 0;
-        StatusEnum opponentColor = StatusEnum.getOpponent(attackerColor);
-        for (int i = -1; i <= 1; i++) {
-            for (int j = -1; j <= 1; j++) {
-                if (i == 0 && j == 0) continue;
-                Space neighborSpace = getSpaceAt(x + i, y + j);
-                if (neighborSpace != null && neighborSpace.getStatus() == opponentColor) {
-                    count++;
-                }
-            }
-        }
-        return count;
+        // Este método não precisa ser alterado.
     }
 
     public boolean isOutOfBounds(int x, int y) {
