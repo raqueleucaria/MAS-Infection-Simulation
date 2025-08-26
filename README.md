@@ -1,34 +1,73 @@
+# Aplicação e Análise de Algoritmos em Cenários de Uso Comportamentais<br>
+**Autora**: Raquel Eucaria
 
-# 🦠 Infection
+## Sobre o Projeto
+O **Infection** é uma simulação de competição biológica desenvolvida para explorar dinâmicas de Sistemas Multiagentes. O projeto modela a disputa por território entre duas colônias de micróbios (Vermelha e Azul) em um ambiente discreto (um tabuleiro 7x7), onde o comportamento coletivo e os padrões de dominação emergem a partir de regras individuais simples.
 
-Uma implementação de Sistemas Multiagentes Comportamentais para o jogo Infection.
+A simulação foi desenvolvida em **Java** utilizando o framework **JADE**, que gerencia o ciclo de vida e a comunicação assíncrona entre os agentes através do protocolo FIPA ACL.
 
-## 📜 Regras do Jogo
+[//]: # (<div align='center'><center>)
 
-- 🎯 O jogo tem como objetivo que um tipo de micrópio domine o tabuleiro até o final do jogo.
-- 🧩 O tabuleiro é uma matriz 7x7.
-- 🔵 Dois micróbios azuis são posicionados nos cantos superior esquerdo (0,0) e inferior direito (6,6).
-- 🔴 Dois micróbios vermelhos ocupam os outros dois cantos restantes (0,6), (6,0).
-- ♟️ O jogador vermelho começa o primeiro turno se movendo. Os turnos alternam entre vermelho e azul.
- 
-### 🔁 Movimentação
+[//]: # (<img src="docs/assets/infection_game.jpg" width="60%">)
 
-A cada turno, é possível realizar um movimento com qualquer um de seus micróbios:
+[//]: # (<label>Jogo "Infection" de The 7th Guest, inspiração para a dinâmica da simulação.</label>)
 
-- **Copiar**: O micróbio pode se replicar para uma casa adjacente (distância 1). O original permanece no lugar.
-- **Pular**: O micróbio pode pular para uma casa a duas posições de distância. Nesse caso, a posição de origem fica vazia.
+[//]: # (</center></div>)
 
-### 🧬 Infecção
+Os agentes implementados na simulação são:
 
-Após o movimento, se houver micróbios oponentes nas casas adjacentes à nova posição, eles são infectados (convertidos) para o lado que se moveu.
+* **`SimulationManagerAgent`**: Atua como o ambiente, gerenciando o estado do tabuleiro, validando movimentos, aplicando as regras de infecção e determinando o fim da partida.
+* **`MicrobeAgent`**: Agente reativo que representa um micróbio. A cada ciclo, ele percebe o ambiente, decide sua próxima ação (Copiar ou Pular) com base em uma estratégia para maximizar a infecção, e propõe o movimento ao gerenciador.
 
-### ⏳ Fim de Jogo
+[//]: # (Mais detalhes sobre a arquitetura, o comportamento dos agentes e as regras de negócio podem ser encontrados na documentação técnica do projeto.)
 
-- O jogo termina quando todas as células do tabuleiro estiverem preenchidas.
-- 🏆 Vence o micróbio com maior quantidade no tabuleiro.
+[//]: # ()
+[//]: # (* **[📄 Documentação de Implementação]&#40;implementacao.md&#41;**)
+
+[//]: # (* **[📐 Documentação de Modelagem &#40;AUML&#41;]&#40;modelagem.md&#41;**)
+
+[//]: # (## Screenshots)
+
+[//]: # ()
+[//]: # (<div align='center'>)
+
+[//]: # (  <img src="simulation_animation.gif" /><br><br>)
+
+[//]: # (  <label><strong> Imagem 1:</strong> Execução da Simulação<br> <strong>Fonte:</strong> Autoria Própria, 2025.</label><br><br><br>)
+
+[//]: # (</div>)
+
+## Instalação
+
+1.  **Pré-requisitos:**
+    * Java Development Kit (JDK) 11 ou superior.
+    * Biblioteca JADE configurada no classpath do seu ambiente de desenvolvimento.
+
+2.  **Clone o repositório:**
+    ```bash
+    git clone [https://github.com/raqueleucaria/MAS-Infection-Simulation.git](https://github.com/raqueleucaria/MAS-Infection-Simulation.git)
+    cd MAS-Infection-Simulation
+    ```
+
+## Uso
+
+1.  **Abra o projeto** em sua IDE de preferência (ex: IntelliJ IDEA, Eclipse).
+
+2.  **Configure o classpath** para incluir a biblioteca `jade.jar`.
+
+3.  **Execute a classe principal** para iniciar a simulação:
+    ```
+    br.com.eucaria.InfectionLauncher
+    ```
+    A GUI do JADE será iniciada, e a simulação começará automaticamente no console.
+
 
 ## Referências
 
-- https://en.wikipedia.org/wiki/The_7th_Guest:_Infection
-- https://www.youtube.com/watch?v=4_NzTapUqqM
-- https://leoribeiro.github.io/papers/mcts-ataxx-eniac2018.pdf
+> [1] WOOLDRIDGE, M. *An introduction to multiagent systems*. 2 ed. Chichester: Wiley, 2009.
+>
+> [2] WIKIPEDIA. *The 7th Guest: Infection*. Disponível em: <https://en.wikipedia.org/wiki/The_7th_Guest:_Infection>. Acesso em: 24 ago. 2025.
+>
+> [3] JADE. *JADE (Java Agent DEvelopment Framework)*. Disponível em: https://jade.tilab.com/. Acesso em: 24 ago. 2025.
+>
+> [4] FIPA. *Foundation for Intelligent Physical Agents*. Disponível em: http://fipa.org/. Acesso em: 24 ago. 2025.
