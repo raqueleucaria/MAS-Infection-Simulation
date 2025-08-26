@@ -1,61 +1,66 @@
 package br.com.eucaria.model;
 
-import br.com.eucaria.agent.MicrobeAgent;
-
+import jade.core.AID;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class Space {
+public class Space implements Serializable {
 
-    public record StateChange(int tick, StatusEnum status) {
-        @Override
-        public String toString() {
-            return String.format("Tick %d: %s", tick, status);
-        }
-    }
+    public record StateChange(int tick, MicrobeColorEnum color) implements Serializable {}
 
-    private MicrobeAgent microbeAgent;
+    private AID microbeAID;
+    private MicrobeColorEnum color;
     private final List<StateChange> history;
 
     public Space() {
-        this.microbeAgent = null;
+        this.microbeAID = null;
+        this.color = MicrobeColorEnum.EMPTY;
         this.history = Collections.synchronizedList(new ArrayList<>());
-        recordStateChange(0, StatusEnum.EMPTY);
+        recordStateChange(0, MicrobeColorEnum.EMPTY);
     }
 
-    public List<StateChange> getHistory() {
-        return history;
+    // Construtor de cópia
+    public Space(Space other) {
+        this.microbeAID = other.microbeAID;
+        this.color = other.color;
+        this.history = Collections.synchronizedList(new ArrayList<>(other.history));
     }
 
-    public void setMicrobe(MicrobeAgent microbeAgent, int tick) {
-        this.microbeAgent = microbeAgent;
-        recordStateChange(tick, getStatus());
+    public void setMicrobe(AID microbeAID, MicrobeColorEnum color) {
+        this.microbeAID = microbeAID;
+        this.color = color;
     }
 
-    public void clear(int tick) {
-        this.microbeAgent = null;
-        recordStateChange(tick, StatusEnum.EMPTY);
+    public void clear() {
+        this.microbeAID = null;
+        this.color = MicrobeColorEnum.EMPTY;
     }
 
-    private void recordStateChange(int tick, StatusEnum newStatus) {
-        if (history.isEmpty() || history.get(history.size() - 1).status() != newStatus) {
+    private void recordStateChange(int tick, MicrobeColorEnum newStatus) {
+        if (history.isEmpty() || history.get(history.size() - 1).color() != newStatus) {
             history.add(new StateChange(tick, newStatus));
         }
     }
 
-    public MicrobeAgent getMicrobe() {
-        return this.microbeAgent;
+    public AID getMicrobeAID() {
+        return this.microbeAID;
     }
 
     public boolean isOccupied() {
-        return this.microbeAgent != null;
+        return this.microbeAID != null;
     }
 
-    public StatusEnum getStatus() {
-        if (!isOccupied()) {
-            return StatusEnum.EMPTY;
-        }
-        return microbeAgent.getColor();
+    public MicrobeColorEnum getColor() {
+        return this.color;
+    }
+
+    public List<StateChange> getHistory() {
+        return this.history;
+    }
+
+    public void setColor(MicrobeColorEnum color) {
+        this.color = color;
     }
 }

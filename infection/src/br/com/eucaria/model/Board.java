@@ -1,10 +1,12 @@
 package br.com.eucaria.model;
 
 import br.com.eucaria.agent.MicrobeAgent;
+import jade.core.AID;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Board {
+public class Board implements Serializable {
     public static final int SIZE = 7;
     private final Space[][] grid;
 
@@ -17,58 +19,57 @@ public class Board {
         }
     }
 
-    public void placeMicrobe(MicrobeAgent agent, int x, int y, int tick) {
-        Space space = getSpaceAt(x, y);
-        if (space != null) {
-            space.setMicrobe(agent, tick);
+    // Construtor de cópia para a percepção do agente
+    public Board(Board other) {
+        this.grid = new Space[SIZE][SIZE];
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                this.grid[i][j] = new Space(other.grid[i][j]);
+            }
         }
     }
 
-    public void executeMove(MicrobeAgent microbe, MicrobeAgent.Move move, int tick) {
-        if (move.type() == MicrobeAgent.MoveType.JUMP) {
-            getSpaceAt(microbe.getX(), microbe.getY()).clear(tick);
+    public void placeMicrobe(AID agentID, int x, int y, MicrobeColorEnum color) {
+        if (!isOutOfBounds(x, y)) {
+            grid[y][x].setMicrobe(agentID, color);
         }
-        placeMicrobe(microbe, move.toX(), move.toY(), tick);
     }
 
-    /**
-     * MÉTODO CORRIGIDO: Implementa a lógica de duas fases para evitar reação em cadeia.
-     */
-    public void applyInfection(int x, int y, StatusEnum attackerColor, int tick) {
-        StatusEnum opponentColor = StatusEnum.getOpponent(attackerColor);
+    public void removeMicrobe(int x, int y) {
+        if (!isOutOfBounds(x, y)) {
+            grid[y][x].clear();
+        }
+    }
 
-        // Fase 1: Identificar todos os vizinhos a serem convertidos e guardá-los em uma lista.
-        List<MicrobeAgent> agentsToConvert = new ArrayList<>();
+    public List<AID> applyInfection(int x, int y, MicrobeColorEnum attackerColor) {
+        List<AID> infectedAIDs = new ArrayList<>();
+        MicrobeColorEnum opponentColor = MicrobeColorEnum.getOpponent(attackerColor);
+
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 if (i == 0 && j == 0) continue;
-
                 int neighborX = x + j;
                 int neighborY = y + i;
 
-                Space neighborSpace = getSpaceAt(neighborX, neighborY);
-                if (neighborSpace != null && neighborSpace.isOccupied() && neighborSpace.getStatus() == opponentColor) {
-                    agentsToConvert.add(neighborSpace.getMicrobe());
+                if (!isOutOfBounds(neighborX, neighborY)) {
+                    Space neighborSpace = grid[neighborY][neighborX];
+                    if (neighborSpace.isOccupied() && neighborSpace.getColor() == opponentColor) {
+                        neighborSpace.setColor(attackerColor);
+                        infectedAIDs.add(neighborSpace.getMicrobeAID());
+                    }
                 }
             }
         }
-
-        // Fase 2: Converter todos os agentes que foram identificados.
-        for (MicrobeAgent neighbor : agentsToConvert) {
-            neighbor.beConverted(attackerColor);
-            // Atualiza o Space do agente convertido para registrar a mudança no histórico.
-            getSpaceAt(neighbor.getX(), neighbor.getY()).setMicrobe(neighbor, tick);
-        }
+        return infectedAIDs;
     }
 
-    public int countPotentialInfections(int x, int y, StatusEnum attackerColor) {
+    public int countPotentialInfections(int x, int y, MicrobeColorEnum attackerColor) {
         int count = 0;
-        StatusEnum opponentColor = StatusEnum.getOpponent(attackerColor);
-        for (int i = -1; i <= 1; i++) { // y-offset
-            for (int j = -1; j <= 1; j++) { // x-offset
+        MicrobeColorEnum opponentColor = MicrobeColorEnum.getOpponent(attackerColor);
+        for (int i = -1; i <= 1; i++) {
+            for (int j = -1; j <= 1; j++) {
                 if (i == 0 && j == 0) continue;
-                Space neighborSpace = getSpaceAt(x + j, y + i);
-                if (neighborSpace != null && neighborSpace.getStatus() == opponentColor) {
+                if (!isOutOfBounds(x + j, y + i) && grid[y + i][x + j].getColor() == opponentColor) {
                     count++;
                 }
             }
@@ -76,19 +77,49 @@ public class Board {
         return count;
     }
 
-    // O restante da classe (getters, toString, etc.) permanece o mesmo...
-    public Space getSpaceAt(int x, int y) {
+    public int countMicrobes(MicrobeColorEnum color) {
+        int count = 0;
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                if (grid[i][j].isOccupied() && grid[i][j].getColor() == color) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    public List<AID> getAllMicrobeAIDs() {
+        List<AID> aids = new ArrayList<>();
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                if (grid[i][j].isOccupied()) {
+                    aids.add(grid[i][j].getMicrobeAID());
+                }
+            }
+        }
+        return aids;
+    }
+
+    public MicrobeInfo getMicrobeInfo(AID agentAID) {
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                if (grid[i][j].isOccupied() && grid[i][j].getMicrobeAID().equals(agentAID)) {
+                    return new MicrobeInfo(agentAID, null, grid[i][j].getColor(), j, i, null);
+                }
+            }
+        }
+        return null;
+    }
+
+    public AID getMicrobeAt(int x, int y) {
         if (isOutOfBounds(x, y)) return null;
-        return grid[y][x];
+        return grid[y][x].getMicrobeAID();
     }
 
-    public MicrobeAgent getMicrobeAt(int x, int y) {
-        Space space = getSpaceAt(x, y);
-        return (space != null) ? space.getMicrobe() : null;
-    }
-
-    public void removeMicrobe(int x, int y) {
-        // Este método não precisa ser alterado.
+    public Board getLocalPerception(AID agentAID) {
+        // Retorna uma cópia do board inteiro. Para boards maiores, seria melhor retornar só a vizinhança.
+        return new Board(this);
     }
 
     public boolean isOutOfBounds(int x, int y) {
@@ -102,11 +133,7 @@ public class Board {
         for (int i = 0; i < SIZE; i++) {
             sb.append(i).append(" ");
             for (int j = 0; j < SIZE; j++) {
-                StatusEnum status = grid[i][j].getStatus();
-                sb.append(status.getColorCode())
-                        .append(status.getRepresentation())
-                        .append(StatusEnum.ANSI_RESET)
-                        .append(" ");
+                sb.append(grid[i][j].getColor().getRepresentation()).append(" ");
             }
             sb.append("\n");
         }
