@@ -92,6 +92,9 @@ public class SimulationManagerAgent extends Agent {
         ACLMessage reply = msg.createReply();
         reply.setPerformative(ACLMessage.INFORM);
 
+        // Copia o ID da conversa
+        reply.setConversationId(msg.getConversationId());
+
         // Pega o AID do agente que pediu
         String agentName = msg.getContent();
         AID agentAID = new AID(agentName, AID.ISLOCALNAME);

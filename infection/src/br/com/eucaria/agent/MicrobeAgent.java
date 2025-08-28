@@ -91,14 +91,21 @@ public class MicrobeAgent extends Agent {
                 return;
             }
 
+            // Criar um ID único para esta conversa específica de percepção
+            String conversationId = "perception-" + myAgent.getLocalName() + "-" + System.currentTimeMillis();
+
+            // Enviar o pedido de percepção com o ID da conversa
             ACLMessage request = new ACLMessage(ACLMessage.QUERY_REF);
             request.addReceiver(managerAID);
-
             request.setContent(this.myAgent.getAID().getLocalName());
+            request.setConversationId(conversationId); // <-- LINHA ADICIONADA
             send(request);
 
-            // 2. Esperar pela resposta com o estado do board
-            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
+            // Esperar por uma resposta que corresponda EXATAMENTE ao ID de conversa
+            MessageTemplate mt = MessageTemplate.and(
+                    MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                    MessageTemplate.MatchConversationId(conversationId)
+            );
             ACLMessage reply = myAgent.blockingReceive(mt, 200);
 
             if (reply != null) {
