@@ -91,8 +91,15 @@ public class SimulationManagerAgent extends Agent {
     private void handlePerceptionRequest(ACLMessage msg) throws IOException {
         ACLMessage reply = msg.createReply();
         reply.setPerformative(ACLMessage.INFORM);
-        // Envia uma cópia do board para o agente ter sua percepção
-        reply.setContentObject(new Board(this.board));
+
+        // Pega o AID do agente que pediu
+        String agentName = msg.getContent();
+        AID agentAID = new AID(agentName, AID.ISLOCALNAME);
+
+        // Pede ao tabuleiro a percepção local para esse agente
+        Board localView = this.board.getLocalPerception(agentAID);
+        reply.setContentObject(localView);
+
         send(reply);
     }
 

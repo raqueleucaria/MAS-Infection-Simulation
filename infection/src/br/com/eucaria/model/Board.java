@@ -118,8 +118,37 @@ public class Board implements Serializable {
     }
 
     public Board getLocalPerception(AID agentAID) {
-        // Retorna uma cópia do board inteiro. Para boards maiores, seria melhor retornar só a vizinhança.
-        return new Board(this);
+        MicrobeInfo agentInfo = getMicrobeInfo(agentAID);
+        if (agentInfo == null) {
+            return new Board(); // Retorna um board vazio se o agente não for encontrado
+        }
+
+        int centerX = agentInfo.x();
+        int centerY = agentInfo.y();
+        int perceptionRadius = 2; // O agente pode "ver" 2 células em cada direção
+
+        Board perceptionBoard = new Board(); // Cria um novo board vazio
+
+        for (int i = -perceptionRadius; i <= perceptionRadius; i++) {
+            for (int j = -perceptionRadius; j <= perceptionRadius; j++) {
+                int targetX = centerX + j;
+                int targetY = centerY + i;
+
+                if (!isOutOfBounds(targetX, targetY)) {
+                    Space originalSpace = this.grid[targetY][targetX];
+                    if (originalSpace.isOccupied()) {
+                        // Copia a informação do micróbio para o novo board de percepção
+                        perceptionBoard.placeMicrobe(
+                                originalSpace.getMicrobeAID(),
+                                targetX,
+                                targetY,
+                                originalSpace.getColor()
+                        );
+                    }
+                }
+            }
+        }
+        return perceptionBoard;
     }
 
     public boolean isOutOfBounds(int x, int y) {

@@ -34,6 +34,15 @@ public class MicrobeAgent extends Agent {
     private final Random random = new Random();
     private boolean isAlive = true;
 
+    private double aggressiveness = 0.5; // Inicia neutro (0.0 a 1.0)
+    private int energy = 100; // Energia máxima inicial
+    private double colonyCohesion = 0.5; // Coesão inicial neutra
+
+    private static final int MAX_ENERGY = 100;
+    private static final int ENERGY_REGEN_RATE = 5;
+    private static final int COPY_COST = 10;
+    private static final int JUMP_COST = 25;
+
     @Override
     protected void setup() {
         Object[] args = getArguments();
@@ -81,9 +90,11 @@ public class MicrobeAgent extends Agent {
                 state = ACTIVE; // Tenta de novo no próximo tick se o manager não foi encontrado
                 return;
             }
-            // 1. Pedir percepção ao Manager
+
             ACLMessage request = new ACLMessage(ACLMessage.QUERY_REF);
             request.addReceiver(managerAID);
+
+            request.setContent(this.myAgent.getAID().getLocalName());
             send(request);
 
             // 2. Esperar pela resposta com o estado do board
@@ -97,8 +108,10 @@ public class MicrobeAgent extends Agent {
 
                     if (chosenMove != null) {
                         informActionToManager(chosenMove);
+                        // A energia já foi deduzida no decideMove
                     } else {
                         // Se não tem movimento, agenda despertar para tentar de novo
+                        // O estado pode ter sido mudado para PAUSED dentro de decideMove
                         addBehaviour(new WakerBehaviour(myAgent, 500) {
                             @Override protected void onWake() { state = ACTIVE; }
                         });
@@ -114,31 +127,95 @@ public class MicrobeAgent extends Agent {
         }
     }
 
-    private Move decideMove(Board board) {
-        List<Move> copyMoves = findPossibleMoves(board, MoveType.COPY);
-        List<Move> jumpMoves = findPossibleMoves(board, MoveType.JUMP);
+    private void updateInternalState(Board perception) {
+        int allyCount = 0;
+        int enemyCount = 0;
 
-        int bestJumpInfections = 0;
-        Move bestJumpMove = null;
-        for (Move jump : jumpMoves) {
-            int infections = board.countPotentialInfections(jump.toX(), jump.toY(), this.color);
-            if (infections > bestJumpInfections) {
-                bestJumpInfections = infections;
-                bestJumpMove = jump;
+        // O agente "olha" ao seu redor (raio de 1) para sentir o ambiente
+        for (int i = -1; i <= 1; i++) {
+            for (int j = -1; j <= 1; j++) {
+                if (i == 0 && j == 0) continue;
+
+                AID neighbor = perception.getMicrobeAt(this.x + j, this.y + i);
+                if (neighbor != null) {
+                    // Precisamos saber a cor do vizinho. A percepção nos dá isso.
+                    MicrobeInfo neighborInfo = perception.getMicrobeInfo(neighbor);
+                    if (neighborInfo.color() == this.color) {
+                        allyCount++;
+                    } else {
+                        enemyCount++;
+                    }
+                }
             }
         }
 
-        int bestCopyInfections = 0;
-        Move bestCopyMove = null;
-        if (!copyMoves.isEmpty()) {
-            bestCopyMove = copyMoves.get(0);
-            bestCopyInfections = board.countPotentialInfections(bestCopyMove.toX(), bestCopyMove.toY(), this.color);
+        int totalNeighbors = allyCount + enemyCount;
+        if (totalNeighbors > 0) {
+            this.colonyCohesion = (double) allyCount / totalNeighbors;
+            this.aggressiveness = (double) enemyCount / totalNeighbors;
+        } else {
+            // Se estiver isolado, a agressividade e coesão tendem a um valor neutro
+            this.aggressiveness = 0.5;
+            this.colonyCohesion = 0.5;
         }
 
-        if (bestJumpMove != null && bestJumpInfections > (bestCopyInfections + 2)) {
-            return bestJumpMove;
+        // Regenera energia se não estiver no máximo
+        if (this.energy < MAX_ENERGY) {
+            this.energy += ENERGY_REGEN_RATE;
         }
-        return bestCopyMove;
+    }
+
+    private Move decideMove(Board perception) {
+        // 1. Atualiza o estado interno com base no que vê
+        updateInternalState(perception);
+
+        // 2. Lógica de decisão baseada no estado interno
+        if (this.energy < COPY_COST) {
+            // Se não tem energia para o mais barato, espera.
+            state = PAUSED; // Pausa para regenerar
+            return null;
+        }
+
+        List<Move> copyMoves = findPossibleMoves(perception, MoveType.COPY);
+        List<Move> jumpMoves = findPossibleMoves(perception, MoveType.JUMP);
+
+        // Decisão estratégica:
+        // Se está muito isolado (baixa coesão), a prioridade é JUMP para perto de aliados
+        if (this.colonyCohesion < 0.3 && this.energy >= JUMP_COST && !jumpMoves.isEmpty()) {
+            System.out.println(getLocalName() + " está isolado, tentando SALTAR.");
+            this.energy -= JUMP_COST; // <<<--- ADICIONE ESTA LINHA
+            return findBestInfectionMove(jumpMoves, perception);
+        }
+
+        // Se está em uma zona de conflito (alta agressividade), a prioridade é COPY para expandir
+        if (this.aggressiveness > 0.6 && this.energy >= COPY_COST && !copyMoves.isEmpty()) {
+            System.out.println(getLocalName() + " está agressivo, tentando COPIAR.");
+            this.energy -= COPY_COST; // Deduz a energia
+            return findBestInfectionMove(copyMoves, perception);
+        }
+
+        // Comportamento padrão: se tiver energia, tenta o melhor movimento de cópia
+        if (this.energy >= COPY_COST && !copyMoves.isEmpty()){
+            this.energy -= COPY_COST;
+            return findBestInfectionMove(copyMoves, perception);
+        }
+
+        // Se nada mais for possível, fica parado
+        return null;
+    }
+
+    private Move findBestInfectionMove(List<Move> moves, Board board) {
+        Move bestMove = null;
+        int maxInfections = -1;
+
+        for (Move move : moves) {
+            int potentialInfections = board.countPotentialInfections(move.toX(), move.toY(), this.color);
+            if (potentialInfections > maxInfections) {
+                maxInfections = potentialInfections;
+                bestMove = move;
+            }
+        }
+        return bestMove;
     }
 
     private List<Move> findPossibleMoves(Board board, MoveType type) {
