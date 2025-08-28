@@ -219,7 +219,7 @@ public class SimulationManagerAgent extends Agent {
     }
 
     private void saveHistoryToJson(String filePath) {
-        // ... (código para criar diretório)
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
             writer.write("[\n");
             var iterator = eventLog.iterator();

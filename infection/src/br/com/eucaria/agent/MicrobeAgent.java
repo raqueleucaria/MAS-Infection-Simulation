@@ -257,8 +257,6 @@ public class MicrobeAgent extends Agent {
     }
 
 
-    // Dentro da classe MicrobeAgent.java
-
     private void findAndRegisterWithManager() {
         // 1. Crie um "template" do serviço que você está procurando
         DFAgentDescription template = new DFAgentDescription();
@@ -298,15 +296,12 @@ public class MicrobeAgent extends Agent {
 
             } else {
                 System.out.println("Agente " + getLocalName() + " não encontrou o Manager. Tentando novamente...");
-                // Você pode adicionar uma lógica para tentar novamente mais tarde
-                // Por exemplo, adicionando um WakerBehaviour para chamar este método de novo.
+
             }
         } catch (FIPAException fe) {
             fe.printStackTrace();
         }
     }
-
-    // Este método vai dentro da classe MicrobeAgent
 
     private void informActionToManager(Move move) {
         if (managerAID == null) {
