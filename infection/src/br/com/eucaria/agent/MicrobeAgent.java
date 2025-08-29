@@ -173,18 +173,15 @@ public class MicrobeAgent extends Agent {
 
         if (this.colonyCohesion < 0.3 && this.energy >= JUMP_COST && !jumpMoves.isEmpty()) {
             System.out.println(getLocalName() + " está isolado, tentando SALTAR.");
-            this.energy -= JUMP_COST; // <<<--- ADICIONE ESTA LINHA
             return findBestInfectionMove(jumpMoves, perception);
         }
 
         if (this.aggressiveness > 0.6 && this.energy >= COPY_COST && !copyMoves.isEmpty()) {
             System.out.println(getLocalName() + " está agressivo, tentando COPIAR.");
-            this.energy -= COPY_COST;
             return findBestInfectionMove(copyMoves, perception);
         }
 
         if (this.energy >= COPY_COST && !copyMoves.isEmpty()){
-            this.energy -= COPY_COST;
             return findBestInfectionMove(copyMoves, perception);
         }
 
@@ -314,11 +311,21 @@ public class MicrobeAgent extends Agent {
             if (msg != null) {
                 switch (msg.getPerformative()) {
                     case ACLMessage.ACCEPT_PROPOSAL:
-                        String[] newPos = msg.getContent().split(":");
-                        updatePosition(Integer.parseInt(newPos[0]), Integer.parseInt(newPos[1]));
+                        String[] content = msg.getContent().split(":");
+                        updatePosition(Integer.parseInt(content[0]), Integer.parseInt(content[1]));
+
+                        MoveType moveType = MoveType.valueOf(content[2]);
+
+                        if (moveType == MoveType.COPY) {
+                            energy -= COPY_COST;
+                        } else if (moveType == MoveType.JUMP) {
+                            energy -= JUMP_COST;
+                        }
+                        state = ACTIVE;
                         break;
 
                     case ACLMessage.REJECT_PROPOSAL:
+                        state = ACTIVE;
                         break;
 
                     case ACLMessage.INFORM:
