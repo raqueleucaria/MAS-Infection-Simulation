@@ -73,7 +73,6 @@ public class MicrobeAgent extends Agent {
                     return;
                 }
                 if (state == ACTIVE) {
-                    // Adiciona um comportamento de tiro único para decidir e agir
                     myAgent.addBehaviour(new DecideAndActBehaviour());
                     state = PAUSED;
                 }
@@ -87,21 +86,18 @@ public class MicrobeAgent extends Agent {
         @Override
         public void action() {
             if (managerAID == null) {
-                state = ACTIVE; // Tenta de novo no próximo tick se o manager não foi encontrado
+                state = ACTIVE;
                 return;
             }
 
-            // Criar um ID único para esta conversa específica de percepção
             String conversationId = "perception-" + myAgent.getLocalName() + "-" + System.currentTimeMillis();
 
-            // Enviar o pedido de percepção com o ID da conversa
             ACLMessage request = new ACLMessage(ACLMessage.QUERY_REF);
             request.addReceiver(managerAID);
             request.setContent(this.myAgent.getAID().getLocalName());
-            request.setConversationId(conversationId); // <-- LINHA ADICIONADA
+            request.setConversationId(conversationId);
             send(request);
 
-            // Esperar por uma resposta que corresponda EXATAMENTE ao ID de conversa
             MessageTemplate mt = MessageTemplate.and(
                     MessageTemplate.MatchPerformative(ACLMessage.INFORM),
                     MessageTemplate.MatchConversationId(conversationId)
@@ -115,20 +111,16 @@ public class MicrobeAgent extends Agent {
 
                     if (chosenMove != null) {
                         informActionToManager(chosenMove);
-                        // A energia já foi deduzida no decideMove
                     } else {
-                        // Se não tem movimento, agenda despertar para tentar de novo
-                        // O estado pode ter sido mudado para PAUSED dentro de decideMove
                         addBehaviour(new WakerBehaviour(myAgent, 500) {
                             @Override protected void onWake() { state = ACTIVE; }
                         });
                     }
                 } catch (UnreadableException e) {
                     e.printStackTrace();
-                    state = ACTIVE; // Reativa em caso de erro
+                    state = ACTIVE;
                 }
             } else {
-                // Não obteve percepção, reativa para tentar de novo
                 state = ACTIVE;
             }
         }
@@ -138,14 +130,12 @@ public class MicrobeAgent extends Agent {
         int allyCount = 0;
         int enemyCount = 0;
 
-        // O agente "olha" ao seu redor (raio de 1) para sentir o ambiente
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 if (i == 0 && j == 0) continue;
 
                 AID neighbor = perception.getMicrobeAt(this.x + j, this.y + i);
                 if (neighbor != null) {
-                    // Precisamos saber a cor do vizinho. A percepção nos dá isso.
                     MicrobeInfo neighborInfo = perception.getMicrobeInfo(neighbor);
                     if (neighborInfo.color() == this.color) {
                         allyCount++;
@@ -161,53 +151,43 @@ public class MicrobeAgent extends Agent {
             this.colonyCohesion = (double) allyCount / totalNeighbors;
             this.aggressiveness = (double) enemyCount / totalNeighbors;
         } else {
-            // Se estiver isolado, a agressividade e coesão tendem a um valor neutro
             this.aggressiveness = 0.5;
             this.colonyCohesion = 0.5;
         }
 
-        // Regenera energia se não estiver no máximo
         if (this.energy < MAX_ENERGY) {
             this.energy += ENERGY_REGEN_RATE;
         }
     }
 
     private Move decideMove(Board perception) {
-        // 1. Atualiza o estado interno com base no que vê
         updateInternalState(perception);
 
-        // 2. Lógica de decisão baseada no estado interno
         if (this.energy < COPY_COST) {
-            // Se não tem energia para o mais barato, espera.
-            state = PAUSED; // Pausa para regenerar
+            state = PAUSED;
             return null;
         }
 
         List<Move> copyMoves = findPossibleMoves(perception, MoveType.COPY);
         List<Move> jumpMoves = findPossibleMoves(perception, MoveType.JUMP);
 
-        // Decisão estratégica:
-        // Se está muito isolado (baixa coesão), a prioridade é JUMP para perto de aliados
         if (this.colonyCohesion < 0.3 && this.energy >= JUMP_COST && !jumpMoves.isEmpty()) {
             System.out.println(getLocalName() + " está isolado, tentando SALTAR.");
             this.energy -= JUMP_COST; // <<<--- ADICIONE ESTA LINHA
             return findBestInfectionMove(jumpMoves, perception);
         }
 
-        // Se está em uma zona de conflito (alta agressividade), a prioridade é COPY para expandir
         if (this.aggressiveness > 0.6 && this.energy >= COPY_COST && !copyMoves.isEmpty()) {
             System.out.println(getLocalName() + " está agressivo, tentando COPIAR.");
-            this.energy -= COPY_COST; // Deduz a energia
+            this.energy -= COPY_COST;
             return findBestInfectionMove(copyMoves, perception);
         }
 
-        // Comportamento padrão: se tiver energia, tenta o melhor movimento de cópia
         if (this.energy >= COPY_COST && !copyMoves.isEmpty()){
             this.energy -= COPY_COST;
             return findBestInfectionMove(copyMoves, perception);
         }
 
-        // Se nada mais for possível, fica parado
         return null;
     }
 
@@ -265,37 +245,31 @@ public class MicrobeAgent extends Agent {
 
 
     private void findAndRegisterWithManager() {
-        // 1. Crie um "template" do serviço que você está procurando
         DFAgentDescription template = new DFAgentDescription();
         ServiceDescription sd = new ServiceDescription();
-        sd.setType("environment-manager"); // Procura por qualquer agente que ofereça este tipo de serviço
+        sd.setType("environment-manager");
         template.addServices(sd);
 
         try {
-            // 2. Peça ao DF para procurar por agentes que correspondam ao template
             DFAgentDescription[] result = DFService.search(this, template);
 
             if (result.length > 0) {
-                // 3. Encontrou! Guarda o AID do primeiro agente encontrado
                 managerAID = result[0].getName();
                 System.out.println("Agente " + getLocalName() + " encontrou o Manager: " + managerAID.getLocalName());
 
-                // 4. Agora que encontrou, envia a mensagem de registro correta
                 ACLMessage registerMsg = new ACLMessage(ACLMessage.INFORM);
                 registerMsg.addReceiver(managerAID);
                 try {
-                    // Cria o objeto MicrobeInfo com o estado inicial do agente
                     MicrobeInfo initialState = new MicrobeInfo(
                             getAID(),
-                            MicrobeStatusEnum.CREATED, // Ou o status inicial que preferir
+                            MicrobeStatusEnum.CREATED,
                             this.color,
                             this.x,
                             this.y,
                             Instant.now()
                     );
-                    // Define o objeto como conteúdo da mensagem
                     registerMsg.setContentObject(initialState);
-                    send(registerMsg); // Efetivamente envia a mensagem
+                    send(registerMsg);
 
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -318,7 +292,6 @@ public class MicrobeAgent extends Agent {
 
         ACLMessage proposeMsg = new ACLMessage(ACLMessage.PROPOSE);
         proposeMsg.addReceiver(managerAID);
-        // Usamos um protocolo para que o Manager possa filtrar facilmente essas mensagens
         proposeMsg.setProtocol("propose-action");
         try {
             proposeMsg.setContentObject(move);
@@ -341,21 +314,17 @@ public class MicrobeAgent extends Agent {
             if (msg != null) {
                 switch (msg.getPerformative()) {
                     case ACLMessage.ACCEPT_PROPOSAL:
-                        // O movimento foi bem-sucedido, o Manager nos envia a nova posição
                         String[] newPos = msg.getContent().split(":");
                         updatePosition(Integer.parseInt(newPos[0]), Integer.parseInt(newPos[1]));
                         break;
 
                     case ACLMessage.REJECT_PROPOSAL:
-                        // Ação falhou, o agente tentará de novo no próximo tick ativo.
-                        // Não precisamos fazer nada, o estado continua PAUSED até o WakerBehaviour o ativar.
                         break;
 
                     case ACLMessage.INFORM:
                         if ("GAME_OVER".equals(msg.getContent())) {
-                            isAlive = false; // Sinaliza para o TickerBehaviour parar e o agente morrer
+                            isAlive = false;
                         } else {
-                            // Se não for fim de jogo, assume que é uma notificação de infecção
                             MicrobeColorEnum newColor = MicrobeColorEnum.valueOf(msg.getContent());
                             beConverted(newColor);
                         }

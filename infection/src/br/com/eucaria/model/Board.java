@@ -19,7 +19,6 @@ public class Board implements Serializable {
         }
     }
 
-    // Construtor de cópia para a percepção do agente
     public Board(Board other) {
         this.grid = new Space[SIZE][SIZE];
         for (int i = 0; i < SIZE; i++) {
@@ -120,14 +119,14 @@ public class Board implements Serializable {
     public Board getLocalPerception(AID agentAID) {
         MicrobeInfo agentInfo = getMicrobeInfo(agentAID);
         if (agentInfo == null) {
-            return new Board(); // Retorna um board vazio se o agente não for encontrado
+            return new Board();
         }
 
         int centerX = agentInfo.x();
         int centerY = agentInfo.y();
-        int perceptionRadius = 2; // O agente pode "ver" 2 células em cada direção
+        int perceptionRadius = 2;
 
-        Board perceptionBoard = new Board(); // Cria um novo board vazio
+        Board perceptionBoard = new Board();
 
         for (int i = -perceptionRadius; i <= perceptionRadius; i++) {
             for (int j = -perceptionRadius; j <= perceptionRadius; j++) {
@@ -137,7 +136,6 @@ public class Board implements Serializable {
                 if (!isOutOfBounds(targetX, targetY)) {
                     Space originalSpace = this.grid[targetY][targetX];
                     if (originalSpace.isOccupied()) {
-                        // Copia a informação do micróbio para o novo board de percepção
                         perceptionBoard.placeMicrobe(
                                 originalSpace.getMicrobeAID(),
                                 targetX,
@@ -153,6 +151,13 @@ public class Board implements Serializable {
 
     public boolean isOutOfBounds(int x, int y) {
         return x < 0 || x >= SIZE || y < 0 || y >= SIZE;
+    }
+
+    public MicrobeColorEnum getColorAt(int x, int y) {
+        if (isOutOfBounds(x, y)) {
+            return MicrobeColorEnum.EMPTY;
+        }
+        return grid[y][x].getColor();
     }
 
     @Override

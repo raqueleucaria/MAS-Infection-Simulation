@@ -13,11 +13,17 @@ import java.util.UUID;
 import static br.com.eucaria.model.MicrobeColorEnum.BLUE;
 import static br.com.eucaria.model.MicrobeColorEnum.RED;
 
-public class InfectionLauncher {
+public class Main {
 
-    private static final System.Logger LOGGER = System.getLogger(InfectionLauncher.class.getName());
+    private static final System.Logger LOGGER = System.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
+
+        System.out.println("***************************************************");
+        System.out.println("*     I N F E C T I O N - S I M U L A T I O N     *");
+        System.out.println("***************************************************");
+        System.out.println("\nInitializing simulation environment...\n");
+
         Runtime runtime = Runtime.instance();
         Profile profile = new ProfileImpl();
         profile.setParameter(Profile.MAIN_HOST, "localhost");
@@ -25,7 +31,7 @@ public class InfectionLauncher {
         AgentContainer mainContainer = runtime.createMainContainer(profile);
 
         try {
-            // Cria o agente que representa o AMBIENTE primeiro
+
             AgentController manager = mainContainer.createNewAgent(
                     "SimulationManager",
                     "br.com.eucaria.agent.SimulationManagerAgent",
@@ -34,7 +40,7 @@ public class InfectionLauncher {
             manager.start();
             LOGGER.log(System.Logger.Level.INFO, "Ambiente (SimulationManager) iniciado.");
 
-            // Cria os agentes micróbios iniciais
+
             createMicrobeAgent(mainContainer, UUID.randomUUID().toString(), 0, 0, BLUE);
             createMicrobeAgent(mainContainer, UUID.randomUUID().toString(), 6, 6, BLUE);
             createMicrobeAgent(mainContainer, UUID.randomUUID().toString(), 6, 0, RED);
@@ -54,7 +60,7 @@ public class InfectionLauncher {
             int y,
             MicrobeColorEnum color
     ) throws StaleProxyException {
-        // Os argumentos (estado inicial) são passados diretamente para o agente
+
         Object[] args = {x, y, color};
         AgentController agentController = container.createNewAgent(
                 agentName, "br.com.eucaria.agent.MicrobeAgent", args

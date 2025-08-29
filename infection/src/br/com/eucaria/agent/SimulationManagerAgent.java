@@ -1,5 +1,6 @@
 package br.com.eucaria.agent;
 
+import br.com.eucaria.ui.custom.MainFrame;
 import br.com.eucaria.model.Board;
 import br.com.eucaria.model.MicrobeColorEnum;
 import br.com.eucaria.model.MicrobeInfo;
@@ -13,18 +14,21 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
-import jade.lang.acl.MessageTemplate;
 import jade.lang.acl.UnreadableException;
 import jade.wrapper.StaleProxyException;
 
+import java.awt.Color;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.Vector;
+
+import static br.com.eucaria.ui.custom.MainFrame.BLUE_MICROBE_COLOR;
+import static br.com.eucaria.ui.custom.MainFrame.EMPTY_SPACE_BACKGROUND;
+import static br.com.eucaria.ui.custom.MainFrame.RED_MICROBE_COLOR;
 
 public class SimulationManagerAgent extends Agent {
     private static final System.Logger LOGGER = System.getLogger(SimulationManagerAgent.class.getName());
@@ -36,20 +40,51 @@ public class SimulationManagerAgent extends Agent {
     private int tickCount = 0;
     private boolean isGameOver = false;
 
+    private MainFrame gui;
+
     @Override
     protected void setup() {
         LOGGER.log(System.Logger.Level.INFO, "Ambiente ({0}) iniciado.", getLocalName());
         registerService();
+
+        gui = new MainFrame(Board.SIZE);
+        gui.setVisible(true);
+
         addBehaviour(new HandleMicrobeMessagesBehaviour());
         addBehaviour(new TickerBehaviour(this, 1000) {
             @Override
             protected void onTick() {
                 tickCount++;
+                updateGUI();
                 if (isGameOver) {
                     stop();
                 }
             }
         });
+    }
+
+    private void updateGUI() {
+        if (gui == null) return;
+
+        Vector<Color> colors = new Vector<>();
+        for (int i = 0; i < Board.SIZE; i++) {
+            for (int j = 0; j < Board.SIZE; j++) {
+                MicrobeColorEnum colorEnum = board.getColorAt(j, i);
+                switch (colorEnum) {
+                    case RED:
+                        colors.add(RED_MICROBE_COLOR);
+                        break;
+                    case BLUE:
+                        colors.add(BLUE_MICROBE_COLOR);
+                        break;
+                    case EMPTY:
+                    default:
+                        colors.add(EMPTY_SPACE_BACKGROUND);
+                        break;
+                }
+            }
+        }
+        gui.updatePanel(colors);
     }
 
     private class HandleMicrobeMessagesBehaviour extends CyclicBehaviour {
@@ -92,14 +127,11 @@ public class SimulationManagerAgent extends Agent {
         ACLMessage reply = msg.createReply();
         reply.setPerformative(ACLMessage.INFORM);
 
-        // Copia o ID da conversa
         reply.setConversationId(msg.getConversationId());
 
-        // Pega o AID do agente que pediu
         String agentName = msg.getContent();
         AID agentAID = new AID(agentName, AID.ISLOCALNAME);
 
-        // Pede ao tabuleiro a percepção local para esse agente
         Board localView = this.board.getLocalPerception(agentAID);
         reply.setContentObject(localView);
 
@@ -112,7 +144,6 @@ public class SimulationManagerAgent extends Agent {
         AID microbeAID = msg.getSender();
         MicrobeAgent.Move move = (MicrobeAgent.Move) msg.getContentObject();
 
-        // Valida se a célula de destino está livre
         boolean success = board.getMicrobeAt(move.toX(), move.toY()) == null;
         ACLMessage reply = msg.createReply();
 
@@ -121,12 +152,11 @@ public class SimulationManagerAgent extends Agent {
             reply.setContent(move.toX() + ":" + move.toY() + ":" + move.type());
 
             MicrobeInfo currentState = board.getMicrobeInfo(microbeAID);
-            if (currentState == null) return; // Agente fantasma
+            if (currentState == null) return;
 
             if (move.type() == MicrobeAgent.MoveType.COPY) {
-                // A célula de origem não muda, apenas a nova é criada
                 createNewMicrobe(move.toX(), move.toY(), currentState.color());
-            } else { // JUMP
+            } else {
                 board.removeMicrobe(move.fromX(), move.fromY());
                 board.placeMicrobe(microbeAID, move.toX(), move.toY(), currentState.color());
                 MicrobeInfo jumpEvent = new MicrobeInfo(microbeAID, MicrobeStatusEnum.JUMPED, currentState.color(), move.toX(), move.toY(), Instant.now());
@@ -154,6 +184,7 @@ public class SimulationManagerAgent extends Agent {
         }
         send(reply);
         checkGameOver();
+        updateGUI();
     }
 
     private void createNewMicrobe(int x, int y, MicrobeColorEnum color) throws StaleProxyException {
@@ -200,20 +231,16 @@ public class SimulationManagerAgent extends Agent {
 
 
     private void registerService() {
-        // 1. Crie uma "descrição" do seu agente
         DFAgentDescription dfd = new DFAgentDescription();
-        dfd.setName(getAID()); // Diz que o agente que oferece o serviço é ele mesmo
+        dfd.setName(getAID());
 
-        // 2. Crie uma "descrição" do serviço oferecido
         ServiceDescription sd = new ServiceDescription();
-        sd.setType("environment-manager"); // Um "tipo" único para que outros possam encontrar
-        sd.setName("Infection-World-Service"); // Um nome legível para o serviço
+        sd.setType("environment-manager");
+        sd.setName("Infection-World-Service");
 
-        // 3. Adicione o serviço à descrição do agente
         dfd.addServices(sd);
 
         try {
-            // 4. Efetivamente, registre tudo nas Páginas Amarelas
             DFService.register(this, dfd);
             LOGGER.log(System.Logger.Level.INFO, "Serviço de ambiente registrado com sucesso no DF.");
         } catch (FIPAException fe) {

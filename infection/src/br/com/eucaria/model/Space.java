@@ -21,7 +21,6 @@ public class Space implements Serializable {
         recordStateChange(0, MicrobeColorEnum.EMPTY);
     }
 
-    // Construtor de cópia
     public Space(Space other) {
         this.microbeAID = other.microbeAID;
         this.color = other.color;
