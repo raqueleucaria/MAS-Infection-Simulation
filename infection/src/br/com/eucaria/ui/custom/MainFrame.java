@@ -13,8 +13,8 @@ public class MainFrame extends JFrame {
 
     private final Vector<MicrobePanel> microbePanels;
 
-    public MainFrame(int gridSize) {
-        super("Infection Simulation");
+    public MainFrame(int gridSize, int runNumber) {
+        super("Infection Simulation " + runNumber);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(600, 600);
         setLayout(new GridLayout(gridSize, gridSize));

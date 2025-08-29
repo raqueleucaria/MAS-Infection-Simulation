@@ -15,6 +15,8 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.UnreadableException;
+import jade.wrapper.ControllerException;
+import jade.wrapper.PlatformController;
 import jade.wrapper.StaleProxyException;
 
 import java.awt.Color;
@@ -33,21 +35,28 @@ import static br.com.eucaria.ui.custom.MainFrame.RED_MICROBE_COLOR;
 public class SimulationManagerAgent extends Agent {
     private static final System.Logger LOGGER = System.getLogger(SimulationManagerAgent.class.getName());
     private static final String OUTPUT_DIRECTORY = "output/";
-    private static final String HISTORY_FILE_NAME = "simulation_history.json";
 
     private final Board board = new Board();
     private final Vector<MicrobeInfo> eventLog = new Vector<>();
     private int tickCount = 0;
     private boolean isGameOver = false;
 
+    private int simulationRunNumber = 0;
     private MainFrame gui;
 
     @Override
     protected void setup() {
+
+        Object[] args = getArguments();
+        if (args != null && args.length > 0) {
+            this.simulationRunNumber = (int) args[0];
+            LOGGER.log(System.Logger.Level.INFO, "### INICIANDO SIMULAÇÃO - RODADA: " + this.simulationRunNumber + " ###");
+        }
+
         LOGGER.log(System.Logger.Level.INFO, "Ambiente ({0}) iniciado.", getLocalName());
         registerService();
 
-        gui = new MainFrame(Board.SIZE);
+        gui = new MainFrame(Board.SIZE, this.simulationRunNumber);
         gui.setVisible(true);
 
         addBehaviour(new HandleMicrobeMessagesBehaviour());
@@ -187,10 +196,14 @@ public class SimulationManagerAgent extends Agent {
         updateGUI();
     }
 
-    private void createNewMicrobe(int x, int y, MicrobeColorEnum color) throws StaleProxyException {
+    private void createNewMicrobe(int x, int y, MicrobeColorEnum color) {
         String agentName = UUID.randomUUID().toString();
         Object[] args = {x, y, color};
-        getContainerController().createNewAgent(agentName, "br.com.eucaria.agent.MicrobeAgent", args).start();
+        try {
+            getContainerController().createNewAgent(agentName, "br.com.eucaria.agent.MicrobeAgent", args).start();
+        } catch (ControllerException e) {
+            LOGGER.log(System.Logger.Level.ERROR, "Falha ao criar novo microbe em (" + x + "," + y + ")", e);
+        }
     }
 
     private void checkGameOver() {
@@ -221,12 +234,28 @@ public class SimulationManagerAgent extends Agent {
     @Override
     protected void takeDown() {
         LOGGER.log(System.Logger.Level.INFO, "Desligando SimulationManager. Salvando histórico...");
-        saveHistoryToJson(OUTPUT_DIRECTORY + HISTORY_FILE_NAME);
+
+        String uniqueHistoryFileName = String.format("simulation_history_run_%d.json", this.simulationRunNumber);
+        saveHistoryToJson(OUTPUT_DIRECTORY + uniqueHistoryFileName);
+
         try {
             DFService.deregister(this);
         } catch (FIPAException e) {
             e.printStackTrace();
         }
+
+        LOGGER.log(System.Logger.Level.INFO, "### FIM DA SIMULAÇÃO - RODADA: " + this.simulationRunNumber + " ###\n");
+        if (gui != null) {
+            gui.dispose();
+        }
+        try {
+
+            PlatformController platform = getContainerController().getPlatformController();
+            platform.kill();
+        } catch (ControllerException  e) {
+            LOGGER.log(System.Logger.Level.ERROR, "Erro ao tentar desligar a plataforma.", e);
+        }
+
     }
 
 
